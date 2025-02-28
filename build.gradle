@@ -13,6 +13,10 @@ dependencies {
     implementation 'org.apache.groovy:groovy:4.0.14'
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
+     implementation 'org.apache.groovy:groovy-json:4.0.14'
+    implementation 'org.apache.groovy:groovy-sql:4.0.14'
+    implementation 'com.oracle.database.jdbc:ojdbc8:19.8.0.0'
+    implementation fileTree(dir: 'lib', include: '**/*.jar')
 }
 
 test {

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPM Project Filter</title>
+    <style>
+    .ppm-container {
+            width: 98%;
+            max-width:98%;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+            margin: auto;
+            text-align: center;
+        }
+
+        .ppm-header {
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background: #22bada;
+            padding: 15px;
+            border-radius: 8px 8px 0 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .ppm-input {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .ppm-input select {
+            width: 100%;
+            padding: 12px;
+            font-size: 12px;
+            border: none;
+            border-bottom: 1px solid #22bada;
+            background: #f5f5f5;
+            outline: none;
+            transition: border-bottom 0.3s ease-in-out;
+        }
+
+        .ppm-input button {
+            grid-column: span 2;
+            width: 80px;
+            padding: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            border: none;
+            border-radius: 1px;
+            background: #22bada;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s ease-in-out;
+        }
+
+        .ppm-input button:hover {
+            background: #1b99b0;
+        }
+
+        .result-box {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+
+        .dynamic-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .dynamic-table th, .dynamic-table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+           min-width: 100px;
+        }
+
+        .dynamic-table th {
+            background-color: #22bada;
+            color: white;
+          min-width: 100px;
+        }
+      #dynamicTableContainer {
+    margin-top: 20px;
+    width:100%;
+        max-width:2000px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.dynamic-table {
+    min-width: 100%;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+
+    </style>
+</head>
+<body>
+
+<div class="ppm-container">
+    <div class="ppm-header">PPM Project Filter</div>
+
+    <div class="ppm-input">
+        <!-- Object Code Dropdown -->
+        <select id="objectCode" onchange="fetchObjectInstances()">
+            <option value="">Select Object Code</option>
+            <option value="project">Project</option>
+            <option value="idea">Idea</option>
+        </select>
+
+        <!-- Object Instance ID Dropdown -->
+        <select id="objectInstanceId">
+            <option value="">Select Object Instance ID</option>
+        </select>
+
+        <!-- Units Dropdown -->
+        <select id="units" onchange="handleUnitChange()">
+            <option value="">Select Units</option>
+            <option value="time">Time-Varying</option>
+           <!-- <option value="money">Money</option>-->
+        </select>
+
+        <!-- Attribute Dropdown (Populated Dynamically) -->
+        <select id="attribute">
+            <option value="">Select Attribute</option>
+        </select>
+
+        <!-- Time Period Dropdown -->
+        <select id="timePeriod">
+            <option value="">Select Time Period</option>
+           <!-- <option value="weekly">Weekly</option> -->
+            <option value="quarterly">Quarterly</option>
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+        </select>
+
+        <select id="unitOfMeasure">
+            <option value="">Select Time Rate</option>
+            <option value="fte">FTE</option>
+             <option value="hours">Hours</option>
+             <option value="days">Days</option>
+        </select>
+
+        <button onclick="fetchProjectData()">Submit</button>
+    </div>
+
+    <div class="result-box" id="result">
+        Select filters and click Submit
+    </div>
+
+    <!-- Dynamic Table to Display Results -->
+   <div id="dynamicTableContainer"></div>
+
+</div>
+
+<script>
+   async function fetchObjectInstances() {
+    const objectCode = document.getElementById("objectCode").value;
+    const objectInstanceDropdown = document.getElementById("objectInstanceId");
+
+    objectInstanceDropdown.innerHTML = "<option>Loading...</option>"; // Show loading message
+
+    let apiUrl = ""; // Default to empty URL
+    if (objectCode === "project") {
+        apiUrl = "http://10.0.0.173:7080/ppm/rest/v1/projects?limit=500"; // URL for project
+    } else if (objectCode === "idea") {
+        apiUrl = "http://10.0.0.173:7080/ppm/rest/v1/ideas?limit=500"; // URL for idea
+    }
+
+    if (apiUrl) {
+        const username = "*****";
+        const password = "***************";
+        const auth = btoa(`${username}:${password}`);
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Basic ${auth}`,
+                    "Content-Type": "application/json"
+                }
+            });
+
+            if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+            const data = await response.json();
+            objectInstanceDropdown.innerHTML = ""; // Clear the dropdown before populating it
+
+            // Check if data._results exists
+            if (data._results && data._results.length > 0) {
+                data._results.forEach(item => {
+                    const option = document.createElement("option");
+                    option.value = item._internalId;
+                    option.textContent = item.name; // Display the name from the data (whether project or idea)
+                    objectInstanceDropdown.appendChild(option);
+                });
+            } else {
+                objectInstanceDropdown.innerHTML = "<option>No data found</option>"; // If no results are found
+            }
+        } catch (error) {
+            console.error("Error fetching object instances:", error);
+            objectInstanceDropdown.innerHTML = "<option>Error loading data</option>"; // Show error message
+        }
+    } else {
+        objectInstanceDropdown.innerHTML = "<option>Select Object Code first</option>"; // If no object code is selected
+    }
+}
+
+    async function handleUnitChange() {
+        const unit = document.getElementById("units").value;
+        const attributeDropdown = document.getElementById("attribute");
+
+        if (unit === "time") {
+            attributeDropdown.innerHTML = "<option>Loading...</option>";
+
+            const apiUrl = "http://10.0.0.173:7080/ppm/rest/v1/private/attributes?filter=((((objectCode+in+('project'))+and+(databaseColumn+startsWith+'%curve'))))&fields=name,attributeCode,objectCode,isSecure,editAccessGroups,viewAccessGroups,databaseTable,databaseColumn,isActive,isDisplayTypeEnabled,flsMode,_isFavorite&sort=name+asc&limit=100";
+            const username = "*****";
+            const password = "***************";
+            const auth = btoa(`${username}:${password}`);
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Basic ${auth}`,
+                        "Content-Type": "application/json"
+                    }
+                });
+
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+
+                const data = await response.json();
+                attributeDropdown.innerHTML = "<option value=''>Select Attribute</option>";
+
+                data._results.forEach(attr => {
+                    const option = document.createElement("option");
+                    option.value = attr.attributeCode;
+                    option.textContent = attr.name + " (" + attr.attributeCode + ")";
+                    attributeDropdown.appendChild(option);
+                });
+               // Add custom options
+            const customOptions = [
+                { value: "cost_plans", text: "Cost Plans" },
+            //    { value: "budgets", text: "Budgets" },
+             //   { value: "benefits_plans", text: "Benefits Plans" }
+            ];
+
+            customOptions.forEach(optionData => {
+                const option = document.createElement("option");
+                option.value = optionData.value;
+                option.textContent = optionData.text;
+                attributeDropdown.appendChild(option);
+            });
+            } catch (error) {
+                console.error("Error fetching attributes:", error);
+                attributeDropdown.innerHTML = "<option>Error loading attributes</option>";
+            }
+        } else {
+            attributeDropdown.innerHTML = "<option value=''>Select Attribute</option>";
+        }
+    }
+
+    function fetchProjectData() {
+        const objectCode = document.getElementById("objectCode").value;
+        const objectInstanceId = document.getElementById("objectInstanceId").value;
+        const units = document.getElementById("units").value;
+        const timePeriod = document.getElementById("timePeriod").value;
+        const attribute = document.getElementById("attribute").value;
+        const unitOfMeasure = document.getElementById("unitOfMeasure").value;
+
+        if (!objectCode || !objectInstanceId || !units || !timePeriod || !attribute || !unitOfMeasure) {
+            document.getElementById("result").innerHTML = "Please select all fields.";
+            return;
+        }
+
+        const apiUrl = `http://10.0.0.173:7080/niku/htmlPortlet.groovy?objectCode=${objectCode}&attribute=${attribute}&objectInstanceId=${objectInstanceId}&units=${units}&timePeriod=${timePeriod}&unitOfMeasure=${unitOfMeasure}`;
+
+fetch(apiUrl)
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error(`HTTP error! Status: ${response.status} - ${text}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+  console.log("data", data)
+        if (data._results && data._results.length > 0) {
+            document.getElementById("result").innerHTML =// `<div class="result-box">
+            //    <strong>Data received:</strong>
+           //     <p>Received allocation data for ${data._results.length} resources.</p>
+          //  </div>`;
+                              document.getElementById("result").style.display = "none";
+            generateDynamicTable(data._results, timePeriod);
+        } else {
+            document.getElementById("result").innerHTML = "No data received from backend.";
+        }
+    })
+    .catch(error => {
+        console.error("Error fetching data:", error);
+        document.getElementById("result").innerHTML = `There was an error fetching the data: ${error.message}`;
+    });
+
+    }
+
+function generateDynamicTable(data, timePeriod) {
+    const tableContainer = document.getElementById("dynamicTableContainer");
+    tableContainer.innerHTML = ''; // Clear previous table if any
+    console.log("Generate Dynamic Tables", data);
+    console.log("Time period", timePeriod);
+  const attribute = Object.keys(data[0])
+  const filteredAttribute = attribute.filter(key => !key.startsWith('_') && key !== 'resource');
+  const key = filteredAttribute[0]
+  console.log("key", key)
+
+    const table = document.createElement("table");
+    table.classList.add("dynamic-table");
+
+    // Create Table Header
+    const headerRow = document.createElement("tr");
+    const nameHeader = document.createElement("th");
+    nameHeader.textContent = "Name";
+    headerRow.appendChild(nameHeader);
+
+   // Create Total column header
+    const totalHeader = document.createElement("th");
+    totalHeader.textContent = "Total";
+    headerRow.appendChild(totalHeader);
+
+
+    // Create dynamic columns based on selected time period
+    const periods = generateColumns(data, timePeriod, key);
+  console.log("periods",periods)
+    periods.forEach(period => {
+        const header = document.createElement("th");
+        header.textContent = period;
+        headerRow.appendChild(header);
+    });
+
+    table.appendChild(headerRow);
+
+    // Add data rows (assuming data contains the necessary attributes like name and periods)
+    data.forEach(item => {
+        const row = document.createElement("tr");
+        const nameCell = document.createElement("td");
+        nameCell.textContent = item.resource ? item.resource.displayValue : "Unknown"; // Use the "displayValue" for name
+        row.appendChild(nameCell);
+
+      // Total column (fetch from _metadata)
+        const totalCell = document.createElement("td");
+        totalCell.textContent = item[key].total ? item[key].total.toFixed(2) : "0"; // Display total or 0 if not available
+        row.appendChild(totalCell);
+
+        // Check if allocationCurve and periodList exist
+        const allocationCurve = item[key] && item[key];
+        const periodList = allocationCurve ? allocationCurve.periodList : null;
+
+        if (periodList && periodList.length > 0) {
+            const periods = periodList[0].periods; // Access periods inside periodList
+            periods.forEach(period => {
+                const periodColumn = formatPeriod(period.start, timePeriod); // Format based on timePeriod
+                const periodCell = document.createElement("td");
+                const periodData = periods.find(p => formatPeriod(p.start, timePeriod) === periodColumn);
+                periodCell.textContent = periodData ? parseFloat(periodData.value).toFixed(2) : 0; // Display value or 0 if not available
+                row.appendChild(periodCell);
+            });
+        } else {
+            // If no periods found, add empty cells
+            periods.forEach(() => {
+                const periodCell = document.createElement("td");
+                periodCell.textContent = 0;
+                row.appendChild(periodCell);
+            });
+        }
+
+        table.appendChild(row);
+    });
+
+    tableContainer.appendChild(table);
+}
+
+function generateColumns(data, timePeriod, key) {
+    const columns = [];
+  console.log("keyyyyyyy", key)
+
+    if (timePeriod === 'monthly') {
+        // Monthly view - Get months from data
+        const months = generateMonthlyColumns(data, key);
+        columns.push(...months);
+    } else if (timePeriod === 'quarterly') {
+        // Quarterly view - Get quarters for each year
+        data.forEach(item => {
+            const periodList = item[key] ? item[key].periodList : [];
+            periodList.forEach(period => {
+                period.periods.forEach(p => {
+                    const quarter = formatDateToQuarter(p.start); // Format to quarter (e.g., "2024-Q1")
+                    if (!columns.includes(quarter)) {
+                        columns.push(quarter);
+                    }
+                });
+            });
+        });
+    } else if (timePeriod === 'yearly') {
+        // Yearly view - Get unique years from data
+        data.forEach(item => {
+            const periodList = item[key] ? item[key].periodList : [];
+            periodList.forEach(period => {
+                period.periods.forEach(p => {
+                    const year = formatDateToYear(p.start); // Format to year (e.g., "2024")
+                    if (!columns.includes(year)) {
+                        columns.push(year);
+                    }
+                });
+            });
+        });
+    }
+
+    return columns;
+}
+
+  function generateMonthlyColumns(data, key) {
+    const months = [];
+
+    data.forEach(item => {
+        const periodList = item[key] ? item[key].periodList : [];
+      console.log("periodList", periodList)
+        periodList.forEach(period => {
+            period.periods.forEach(p => {
+                const month = formatDateToMonth(p.start); // Format to month (e.g., "2024-01")
+                if (!months.includes(month)) {
+                    months.push(month);
+                }
+            });
+        });
+    });
+
+    return months;
+}
+
+
+// Utility function to format date to month (e.g., "2024-01")
+function formatDateToMonth(dateString) {
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // Ensure 2 digits for month
+    return `${year}-${month}`;
+}
+
+// Utility function to format date to quarter (e.g., "2024-Q1")
+function formatDateToQuarter(dateString) {
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const quarter = Math.ceil(month / 3);
+    return `${year}-Q${quarter}`;
+}
+
+// Utility function to format date to year (e.g., "2024")
+function formatDateToYear(dateString) {
+    const date = new Date(dateString);
+    return date.getFullYear();
+}
+
+// Utility function to format period (monthly, quarterly, yearly)
+function formatPeriod(dateString, timePeriod) {
+    if (timePeriod === 'monthly') {
+        return formatDateToMonth(dateString);
+    } else if (timePeriod === 'quarterly') {
+        return formatDateToQuarter(dateString);
+    } else if (timePeriod === 'yearly') {
+        return formatDateToYear(dateString);
+    }
+}
+
+
+</script>
+
+</body>
+</html>
